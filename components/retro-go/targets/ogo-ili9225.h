@@ -17,7 +17,7 @@
 #define RG_SCREEN_DRIVER            5   // ILI9225
 #define RG_SCREEN_HOST              SPI2_HOST
 #define RG_SCREEN_SPEED             SPI_MASTER_FREQ_40M
-#define RG_SCREEN_TYPE              0
+#define RG_SCREEN_TYPE              5
 #define RG_SCREEN_WIDTH             220
 #define RG_SCREEN_HEIGHT            176
 #define RG_SCREEN_ROTATE            0
@@ -59,12 +59,12 @@
 // #define RG_GPIO_GAMEPAD_DATA        GPIO_NUM_NC
 
 // SPI Display
-#define RG_GPIO_LCD_MISO            GPIO_NUM_19
+#define RG_GPIO_LCD_MISO            GPIO_NUM_NC
 #define RG_GPIO_LCD_MOSI            GPIO_NUM_23
 #define RG_GPIO_LCD_CLK             GPIO_NUM_18
 #define RG_GPIO_LCD_CS              GPIO_NUM_5
 #define RG_GPIO_LCD_DC              GPIO_NUM_21
-#define RG_GPIO_LCD_BCKL            GPIO_NUM_14
+#define RG_GPIO_LCD_BCKL            GPIO_NUM_NC
 #define RG_GPIO_LCD_RST             GPIO_NUM_15
 
 // SPI SD Card

@@ -179,6 +179,15 @@ static void ili9341_cmd(uint8_t cmd, const void *data, size_t data_len)
     //     usleep(5000);
 }
 
+static void ili9225_cmd(uint16_t cmd, const void *data, size_t data_len)
+{
+    spi_queue_transaction(&cmd, 1, 0);
+    if (data && data_len > 0)
+        spi_queue_transaction(data, data_len, 1);
+    // if ((cmd & 0xE0) == 0x00)
+    //     usleep(5000);
+}
+
 static void lcd_set_backlight(double percent)
 {
     double level = RG_MIN(RG_MAX(percent / 100.0, 0), 1.0);
@@ -231,7 +240,7 @@ static void lcd_init(void)
 #endif
 
 #define ILI9341_CMD(cmd, data...) {const uint8_t x[] = data; ili9341_cmd(cmd, x, sizeof(x));}
-#define ILI9225_CMD(cmd, data...) {const uint8_t x[] = data; ili9341_cmd(cmd, x, sizeof(x));}
+#define ILI9225_CMD(cmd, data...) {const uint16_t x[] = data; ili9225_cmd(cmd, x, sizeof(x));}
 #if RG_SCREEN_TYPE == 0 // LCD Model (ODROID-GO)
     ILI9341_CMD(0x01, {});     // Reset
     ILI9341_CMD(0x3A, {0x55}); // Pixel Format Set RGB565
@@ -332,58 +341,63 @@ static void lcd_init(void)
 	usleep(100 * 1000);
 #elif RG_SCREEN_TYPE == 5   /* ILI9225 */
     /* Set SS bit and direction output from S528 to S1 */
-    ILI9225_CMD(ILI9225_POWER_CTRL1, 0x0000); // Set SAP,DSTB,STB
-    ILI9225_CMD(ILI9225_POWER_CTRL2, 0x0000); // Set APON,PON,AON,VCI1EN,VC
-    ILI9225_CMD(ILI9225_POWER_CTRL3, 0x0000); // Set BT,DC1,DC2,DC3
-    ILI9225_CMD(ILI9225_POWER_CTRL4, 0x0000); // Set GVDD
-    ILI9225_CMD(ILI9225_POWER_CTRL5, 0x0000); // Set VCOMH/VCOML voltage
+    ILI9225_CMD(0x10, {0x0000}); // Set SAP,DSTB,STB
+	ILI9225_CMD(0x11, {0x0000}); // Set APON,PON,AON,VCI1EN,VC
+	ILI9225_CMD(0x12, {0x0000}); // Set BT,DC1,DC2,DC3
+	ILI9225_CMD(0x13, {0x0000}); // Set GVDD
+	ILI9225_CMD(0x14, {0x0000}); // Set VCOMH/VCOML voltage
+	usleep(40 * 1000);
 
-    // Power-on sequence
-    ILI9225_CMD(ILI9225_POWER_CTRL2, 0x0018); // Set APON,PON,AON,VCI1EN,VC
-    ILI9225_CMD(ILI9225_POWER_CTRL3, 0x6121); // Set BT,DC1,DC2,DC3
-    ILI9225_CMD(ILI9225_POWER_CTRL4, 0x006F); // Set GVDD   /*007F 0088 */
-    ILI9225_CMD(ILI9225_POWER_CTRL5, 0x495F); // Set VCOMH/VCOML voltage
-    ILI9225_CMD(ILI9225_POWER_CTRL1, 0x0800); // Set SAP,DSTB,STB
-    ILI9225_CMD(ILI9225_POWER_CTRL2, 0x103B); // Set APON,PON,AON,VCI1EN,VC
+	// Power-on sequence
+	ILI9225_CMD(0x11, {0x0018}); // Set APON,PON,AON,VCI1EN,VC
+	ILI9225_CMD(0x12, {0x6121}); // Set BT,DC1,DC2,DC3
+	ILI9225_CMD(0x13, {0x006F}); // Set GVDD	/*007F 0088 */
+	ILI9225_CMD(0x14, {0x495F}); // Set VCOMH/VCOML voltage
+	ILI9225_CMD(0x10, {0x0800}); // Set SAP,DSTB,STB
+	usleep(10 * 1000);
+	ILI9225_CMD(0x11, {0x103B}); // Set APON,PON,AON,VCI1EN,VC
+	usleep(50 * 1000);
 
-    ILI9225_CMD(ILI9225_DRIVER_OUTPUT_CTRL, 0x011C); // set the display line number and display direction
-    ILI9225_CMD(ILI9225_LCD_AC_DRIVING_CTRL, 0x0100); // set 1 line inversion
-    ILI9225_CMD(ILI9225_ENTRY_MODE, 0x1038); // set GRAM write direction and BGR=1.
-    ILI9225_CMD(ILI9225_DISP_CTRL1, 0x0000); // Display off
-    ILI9225_CMD(ILI9225_BLANK_PERIOD_CTRL1, 0x0808); // set the back porch and front porch
-    ILI9225_CMD(ILI9225_FRAME_CYCLE_CTRL, 0x1100); // set the clocks number per line
-    ILI9225_CMD(ILI9225_INTERFACE_CTRL, 0x0000); // CPU interface
-    ILI9225_CMD(ILI9225_OSC_CTRL, 0x0D01); // Set Osc  /*0e01*/
-    ILI9225_CMD(ILI9225_VCI_RECYCLING, 0x0020); // Set VCI recycling
-    ILI9225_CMD(ILI9225_RAM_ADDR_SET1, 0x0000); // RAM Address
-    ILI9225_CMD(ILI9225_RAM_ADDR_SET2, 0x0000); // RAM Address
+	//0x01, 0x011C, // set the display line number and display direction
+	ILI9225_CMD(0x01, {0x021C}); // set the display line number and display direction
+	ILI9225_CMD(0x02, {0x0100}); // set 1 line inversion
+	ILI9225_CMD(0x03, {0x1030}); // set GRAM write direction and BGR=1.
+	ILI9225_CMD(0x07, {0x0000}); // Display off
+	ILI9225_CMD(0x08, {0x0808}); // set the back porch and front porch
+	ILI9225_CMD(0x0B, {0x1100}); // set the clocks number per line
+	ILI9225_CMD(0x0C, {0x0000}); // CPU interface
+	ILI9225_CMD(0x0F, {0x0D01}); // Set Osc  /*0e01*/
+	ILI9225_CMD(0x15, {0x0020}); // Set VCI recycling
+	ILI9225_CMD(0x20, {0x0000}); // Horizontal GRAM Address Set
+	ILI9225_CMD(0x21, {0x0000}); // Vertical GRAM Address Set
 
-    /* Set GRAM area */
-    ILI9225_CMD(ILI9225_GATE_SCAN_CTRL, 0x0000); 
-    ILI9225_CMD(ILI9225_VERTICAL_SCROLL_CTRL1, 0x00DB); 
-    ILI9225_CMD(ILI9225_VERTICAL_SCROLL_CTRL2, 0x0000); 
-    ILI9225_CMD(ILI9225_VERTICAL_SCROLL_CTRL3, 0x0000); 
-    ILI9225_CMD(ILI9225_PARTIAL_DRIVING_POS1, 0x00DB); 
-    ILI9225_CMD(ILI9225_PARTIAL_DRIVING_POS2, 0x0000); 
-    ILI9225_CMD(ILI9225_HORIZONTAL_WINDOW_ADDR1, 0x00AF); 
-    ILI9225_CMD(ILI9225_HORIZONTAL_WINDOW_ADDR2, 0x0000); 
-    ILI9225_CMD(ILI9225_VERTICAL_WINDOW_ADDR1, 0x00DB); 
-    ILI9225_CMD(ILI9225_VERTICAL_WINDOW_ADDR2, 0x0000); 
+	/* Set GRAM area */
+	ILI9225_CMD(0x30, {0x0000});
+	ILI9225_CMD(0x31, {0x00DB});
+	ILI9225_CMD(0x32, {0x0000});
+	ILI9225_CMD(0x33, {0x0000});
+	ILI9225_CMD(0x34, {0x00DB});
+	ILI9225_CMD(0x35, {0x0000});
+	ILI9225_CMD(0x36, {0x00AF});
+	ILI9225_CMD(0x37, {0x0000});
+	ILI9225_CMD(0x38, {0x00DB});
+	ILI9225_CMD(0x39, {0x0000});
 
-    /* Set GAMMA curve */
-    ILI9225_CMD(ILI9225_GAMMA_CTRL1, 0x0000); 
-    ILI9225_CMD(ILI9225_GAMMA_CTRL2, 0x0808); 
-    ILI9225_CMD(ILI9225_GAMMA_CTRL3, 0x080A); 
-    ILI9225_CMD(ILI9225_GAMMA_CTRL4, 0x000A); 
-    ILI9225_CMD(ILI9225_GAMMA_CTRL5, 0x0A08); 
-    ILI9225_CMD(ILI9225_GAMMA_CTRL6, 0x0808); 
-    ILI9225_CMD(ILI9225_GAMMA_CTRL7, 0x0000); 
-    ILI9225_CMD(ILI9225_GAMMA_CTRL8, 0x0A00); 
-    ILI9225_CMD(ILI9225_GAMMA_CTRL9, 0x0710); 
-    ILI9225_CMD(ILI9225_GAMMA_CTRL10, 0x0710); 
+	/* Set GAMMA curve */
+	ILI9225_CMD(0x50, {0x0000});
+	ILI9225_CMD(0x51, {0x0808});
+	ILI9225_CMD(0x52, {0x080A});
+	ILI9225_CMD(0x53, {0x000A});
+	ILI9225_CMD(0x54, {0x0A08});
+	ILI9225_CMD(0x55, {0x0808});
+	ILI9225_CMD(0x56, {0x0000});
+	ILI9225_CMD(0x57, {0x0A00});
+	ILI9225_CMD(0x58, {0x0710});
+	ILI9225_CMD(0x59, {0x0710});
+	ILI9225_CMD(0x07, {0x0012});
+	usleep(50 * 1000);
+	ILI9225_CMD(0x07, {0x1017})
 
-    ILI9225_CMD(ILI9225_DISP_CTRL1, 0x0012); 
-    ILI9225_CMD(ILI9225_DISP_CTRL1, 0x1017);
 #else
     #error "LCD init sequence is not defined for this device!"
 #endif
