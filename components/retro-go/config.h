@@ -8,6 +8,8 @@
 #include "targets/retro-esp32.h"
 #elif defined(RG_TARGET_SDL2)
 #include "targets/sdl2.h"
+#elif defined(RG_TARGET_CUSTOM_OGO)
+#include "targets/custom-ogo.h"
 #else
 #warning "No target defined. Defaulting to ODROID-GO."
 #include "targets/odroid-go.h"
