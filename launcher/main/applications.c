@@ -98,10 +98,10 @@ static void scan_folder(retro_app_t *app, const char* path, void *parent)
 
 static void application_init(retro_app_t *app)
 {
-    if (app->initialized)
-        return;
-
     RG_LOGI("Initializing application '%s' (%s)\n", app->description, app->partition);
+
+    if (app->initialized)
+        app->files_count = 0;
 
     // This checks if we have crc cover folders, the idea is to skip the crc later on if we don't!
     // It adds very little delay but it could become an issue if someone has thousands of named files...
@@ -128,14 +128,14 @@ static void application_start(retro_file_t *file, int load_state)
     char *part = strdup(file->app->partition);
     char *name = strdup(file->app->short_name);
     char *path = strdup(get_file_path(file));
-    int flags = (gui.startup ? RG_BOOT_ONCE : 0);
+    int flags = (gui.startup_mode ? RG_BOOT_ONCE : 0);
     if (load_state != -1)
     {
         flags |= RG_BOOT_RESUME;
         flags |= (load_state << 4) & RG_BOOT_SLOT_MASK;
     }
     bookmark_add(BOOK_TYPE_RECENT, file); // This could relocate *file, but we no longer need it
-    rg_system_start_app(part, name, path, flags);
+    rg_system_switch_app(part, name, path, flags);
 }
 
 static void crc_cache_init(void)
@@ -162,10 +162,6 @@ static void crc_cache_init(void)
             crc_cache->count = 0;
         }
         fclose(fp);
-    }
-    else
-    {
-        rg_storage_mkdir(RG_BASE_PATH_CACHE);
     }
 }
 
@@ -652,7 +648,7 @@ void application_show_file_menu(retro_file_t *file, bool advanced)
 
 static void application(const char *desc, const char *name, const char *exts, const char *part, uint16_t crc_offset)
 {
-    if (!rg_system_find_app(part))
+    if (!rg_system_have_app(part))
     {
         RG_LOGI("Application '%s' (%s) not present, skipping\n", desc, part);
         return;
@@ -661,17 +657,17 @@ static void application(const char *desc, const char *name, const char *exts, co
     retro_app_t *app = calloc(1, sizeof(retro_app_t));
     apps[apps_count++] = app;
 
-    snprintf(app->description, 60, "%s", desc);
-    snprintf(app->short_name, 60, "%s", name);
-    snprintf(app->partition, 60, "%s", part);
-    snprintf(app->extensions, 60, " %s ", exts);
+    snprintf(app->description, sizeof(app->description), "%s", desc);
+    snprintf(app->short_name, sizeof(app->short_name), "%s", name);
+    snprintf(app->partition, sizeof(app->partition), "%s", part);
+    snprintf(app->extensions, sizeof(app->extensions), " %s ", exts);
     rg_strtolower(app->partition);
     rg_strtolower(app->short_name);
     rg_strtolower(app->extensions);
     snprintf(app->paths.covers, RG_PATH_MAX, RG_BASE_PATH_COVERS "/%s", app->short_name);
     snprintf(app->paths.saves, RG_PATH_MAX, RG_BASE_PATH_SAVES "/%s", app->short_name);
     snprintf(app->paths.roms, RG_PATH_MAX, RG_BASE_PATH_ROMS "/%s", app->short_name);
-    app->available = rg_system_find_app(app->partition);
+    app->available = rg_system_have_app(app->partition);
     app->files = calloc(10, sizeof(retro_file_t));
     app->crc_offset = crc_offset;
 

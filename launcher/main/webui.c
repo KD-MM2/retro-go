@@ -1,4 +1,5 @@
 #include "rg_system.h"
+#include "gui.h"
 
 #ifdef RG_ENABLE_NETWORKING
 #include <esp_http_server.h>
@@ -51,10 +52,12 @@ static esp_err_t http_api_handler(httpd_req_t *req)
 
     cJSON *response = cJSON_CreateObject();
 
+    gui.http_lock = true;
+
     if (strcmp(cmd, "list") == 0)
     {
         cJSON *array = cJSON_AddArrayToObject(response, "files");
-        rg_scandir_t *files = rg_storage_scandir(arg1, NULL, true);
+        rg_scandir_t *files = rg_storage_scandir(arg1, NULL, RG_SCANDIR_SORT | RG_SCANDIR_STAT);
         for (rg_scandir_t *entry = files; entry && entry->is_valid; ++entry)
         {
             cJSON *obj = cJSON_CreateObject();
@@ -69,19 +72,25 @@ static esp_err_t http_api_handler(httpd_req_t *req)
     else if (strcmp(cmd, "rename") == 0)
     {
         success = rename(arg1, arg2) == 0;
+        gui_invalidate();
     }
     else if (strcmp(cmd, "delete") == 0)
     {
         success = rg_storage_delete(arg1);
+        gui_invalidate();
     }
     else if (strcmp(cmd, "mkdir") == 0)
     {
         success = rg_storage_mkdir(arg1);
+        gui_invalidate();
     }
     else if (strcmp(cmd, "touch") == 0)
     {
         success = (fp = fopen(arg1, "wb")) && fclose(fp) == 0;
+        gui_invalidate();
     }
+
+    gui.http_lock = false;
 
     cJSON_AddBoolToObject(response, "success", success);
 
@@ -101,6 +110,9 @@ static esp_err_t http_upload_handler(httpd_req_t *req)
     char *filename = urldecode(req->uri);
 
     RG_LOGI("Receiving file: %s", filename);
+
+    gui.http_lock = true;
+    rg_task_delay(100);
 
     FILE *fp = fopen(filename, "wb");
     if (!fp)
@@ -125,6 +137,9 @@ static esp_err_t http_upload_handler(httpd_req_t *req)
     fclose(fp);
     free(filename);
 
+    gui.http_lock = false;
+    gui_invalidate();
+
     if (received < req->content_len)
     {
         RG_LOGE("Received %d/%d bytes", received, req->content_len);
@@ -144,6 +159,8 @@ static esp_err_t http_download_handler(httpd_req_t *req)
     FILE *fp;
 
     RG_LOGI("Serving file: %s", filename);
+
+    gui.http_lock = true;
 
     if ((fp = fopen(filename, "rb")))
     {
@@ -167,6 +184,8 @@ static esp_err_t http_download_handler(httpd_req_t *req)
         httpd_resp_send_404(req);
     }
     free(filename);
+
+    gui.http_lock = false;
 
     return ESP_OK;
 }
@@ -193,9 +212,15 @@ void webui_start(void)
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.uri_match_fn = httpd_uri_match_wildcard;
-    ESP_ERROR_CHECK(httpd_start(&server, &config));
 
-    http_buffer = malloc(0x20000);
+    esp_err_t err = httpd_start(&server, &config);
+    if (err != ESP_OK)
+    {
+        RG_LOGE("Failed to start webserver: 0x%03X", err);
+        return;
+    }
+
+    http_buffer = malloc(0x10000);
 
     httpd_register_uri_handler(server, &(httpd_uri_t){
         .uri       = "/",
@@ -222,7 +247,7 @@ void webui_start(void)
     });
 
     RG_ASSERT(http_buffer && server, "Something went wrong starting server");
-    RG_LOGI("File server started");
+    RG_LOGI("Web server started");
 }
 
 #endif

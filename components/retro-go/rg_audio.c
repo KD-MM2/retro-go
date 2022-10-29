@@ -5,11 +5,11 @@
 #include <string.h>
 #include <unistd.h>
 
-#ifdef RG_TARGET_SDL2
-#include <SDL2/SDL.h>
-#else
+#ifndef RG_TARGET_SDL2
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
+#else
+#include <SDL2/SDL.h>
 #endif
 
 #if RG_AUDIO_USE_INT_DAC || RG_AUDIO_USE_EXT_DAC
@@ -54,6 +54,7 @@ static const char *SETTING_OUTPUT = "AudioSink";
 static const char *SETTING_VOLUME = "Volume";
 static const char *SETTING_FILTER = "AudioFilter";
 
+#ifndef RG_TARGET_SDL2
 #define ACQUIRE_DEVICE(timeout)                        \
     ({                                                 \
         int x = xSemaphoreTake(audioDevLock, timeout); \
@@ -62,7 +63,10 @@ static const char *SETTING_FILTER = "AudioFilter";
         x;                                             \
     })
 #define RELEASE_DEVICE() xSemaphoreGive(audioDevLock);
-
+#else
+#define ACQUIRE_DEVICE(timeout) (1)
+#define RELEASE_DEVICE()
+#endif
 
 void rg_audio_init(int sampleRate)
 {

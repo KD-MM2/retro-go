@@ -81,7 +81,7 @@ bool rg_gui_set_theme(const char *theme_name)
     gui.style.box_border = get_theme_value(theme, "box_border", C_DIM_GRAY);
     gui.style.item_standard = get_theme_value(theme, "item_standard", C_WHITE);
     gui.style.item_disabled = get_theme_value(theme, "item_disabled", C_GRAY);
-    gui.style.scrollbar = get_theme_value(theme, "scrollbar", C_RED);
+    gui.style.scrollbar = get_theme_value(theme, "scrollbar", C_WHITE);
 
     RG_LOGI("Theme set to '%s'!\n", theme_name ?: "(none)");
 
@@ -399,7 +399,7 @@ void rg_gui_draw_battery(int x_pos, int y_pos)
     if (y_pos < 0)
         y_pos += gui.screen_height;
 
-    int width = 20, height = 10;
+    int width = 16, height = 10;
     int width_fill = width;
     rg_color_t color_fill = C_DARK_GRAY;
     rg_color_t color_border = C_SILVER;
@@ -431,10 +431,10 @@ void rg_gui_draw_radio(int x_pos, int y_pos)
         y_pos += gui.screen_height;
 
     rg_network_t net = rg_network_get_info();
-    rg_color_t color_fill = net.connected ? C_GREEN : -1;
-    rg_color_t color_border = net.connected ? C_SILVER : C_DIM_GRAY;
+    rg_color_t color_fill = (net.state == RG_WIFI_CONNECTED) ? C_GREEN : -1;
+    rg_color_t color_border = (net.state == RG_WIFI_CONNECTED) ? C_SILVER : C_DIM_GRAY;
 
-    if (!net.initialized)
+    if (net.state == RG_WIFI_INVALID)
         return;
 
     int seg_width = 4;
@@ -514,7 +514,7 @@ void rg_gui_draw_status_bars(void)
     rg_gui_draw_text(0, 0, gui.screen_width, header, C_WHITE, C_BLACK, RG_TEXT_ALIGN_TOP);
     rg_gui_draw_text(0, 0, gui.screen_width, footer, C_WHITE, C_BLACK, RG_TEXT_ALIGN_BOTTOM);
 
-    rg_gui_draw_battery(-26, 3);
+    rg_gui_draw_battery(-22, 3);
     rg_gui_draw_radio(-54, 3);
 }
 
@@ -664,20 +664,20 @@ void rg_gui_draw_dialog(const char *title, const rg_gui_option_t *options, int s
     // Basic scroll indicators are overlayed at the end...
     if (top_i > 0)
     {
-        int x = box_x + inner_width + box_padding;
-        int y = box_y + box_padding - 1;
-        rg_gui_draw_rect(x, y, 3, 3, 0, 0, gui.style.scrollbar);
-        rg_gui_draw_rect(x + 6, y, 3, 3, 0, 0, gui.style.scrollbar);
-        rg_gui_draw_rect(x + 12, y, 3, 3, 0, 0, gui.style.scrollbar);
+        int x = box_x + box_width - 10;
+        int y = box_y + box_padding + 2;
+        rg_gui_draw_rect(x + 0, y - 0, 6, 2, 0, 0, gui.style.scrollbar);
+        rg_gui_draw_rect(x + 1, y - 2, 4, 2, 0, 0, gui.style.scrollbar);
+        rg_gui_draw_rect(x + 2, y - 4, 2, 2, 0, 0, gui.style.scrollbar);
     }
 
     if (i < options_count)
     {
-        int x = box_x + inner_width + box_padding;
-        int y = box_y + box_height - box_padding - 1;
-        rg_gui_draw_rect(x, y, 3, 3, 0, 0, gui.style.scrollbar);
-        rg_gui_draw_rect(x + 6, y, 3, 3, 0, 0, gui.style.scrollbar);
-        rg_gui_draw_rect(x + 12, y, 3, 3, 0, 0, gui.style.scrollbar);
+        int x = box_x + box_width - 10;
+        int y = box_y + box_height - 6;
+        rg_gui_draw_rect(x + 0, y - 4, 6, 2, 0, 0, gui.style.scrollbar);
+        rg_gui_draw_rect(x + 1, y - 2, 4, 2, 0, 0, gui.style.scrollbar);
+        rg_gui_draw_rect(x + 2, y - 0, 2, 2, 0, 0, gui.style.scrollbar);
     }
 
     rg_gui_flush();
@@ -1108,11 +1108,11 @@ int rg_gui_about_menu(const rg_gui_option_t *extra_options)
         strcat(build_ver, ")");
     }
 
-    rg_network_t info = rg_network_get_info();
-    if (info.connected) sprintf(network_str, "%s\n%s", info.ssid, info.local_addr);
-    else if (info.connecting) strcpy(network_str, "connecting...");
-    else if (info.connected) strcpy(network_str, "disconnected");
-    else strcpy(network_str, "unavailable");
+    rg_network_t net = rg_network_get_info();
+    if (net.state == RG_WIFI_CONNECTED) sprintf(network_str, "%s\n%s", net.ssid, net.local_addr);
+    else if (net.state == RG_WIFI_CONNECTING) strcpy(network_str, "connecting...");
+    else if (net.ssid[0]) strcpy(network_str, "disconnected");
+    else strcpy(network_str, "not configured");
 
     int sel = rg_gui_dialog("Retro-Go", options, -1);
 
@@ -1122,8 +1122,7 @@ int rg_gui_about_menu(const rg_gui_option_t *extra_options)
     switch (sel)
     {
         case 1000:
-            rg_system_set_boot_app(RG_APP_FACTORY);
-            rg_system_restart();
+            rg_system_switch_app(RG_APP_FACTORY, RG_APP_FACTORY, 0, 0);
             break;
         case 2000:
             if (rg_gui_confirm("Reset all settings?", NULL, false)) {
@@ -1286,6 +1285,9 @@ int rg_gui_game_menu(void)
 
     sel = rg_gui_dialog("Retro-Go", choices, 0);
 
+    rg_settings_commit();
+    rg_system_save_time();
+
     if (sel == 3000)
     {
         const rg_gui_option_t choices[] = {
@@ -1299,7 +1301,7 @@ int rg_gui_game_menu(void)
     switch (sel)
     {
         case 1000: if ((slot = rg_gui_savestate_menu("Save", 0, 0)) >= 0) rg_emu_save_state(slot); break;
-        case 2000: if ((slot = rg_gui_savestate_menu("Save", 0, 0)) >= 0) {rg_emu_save_state(slot); exit(0);} break;
+        case 2000: if ((slot = rg_gui_savestate_menu("Save", 0, 0)) >= 0) {rg_emu_save_state(slot); rg_system_switch_app(RG_APP_LAUNCHER, 0, 0, 0);} break;
         case 3001: if ((slot = rg_gui_savestate_menu("Load", 0, 0)) >= 0) rg_emu_load_state(slot); break;
         case 3002: rg_emu_reset(false); break;
         case 3003: rg_emu_reset(true); break;
@@ -1308,7 +1310,7 @@ int rg_gui_game_menu(void)
     #endif
         case 5500: rg_gui_options_menu(); break;
         case 6000: rg_gui_about_menu(NULL); break;
-        case 7000: exit(0); break;
+        case 7000: rg_system_switch_app(RG_APP_LAUNCHER, 0, 0, 0); break;
     }
 
     rg_audio_set_mute(false);

@@ -8,7 +8,6 @@
 
 #include "applications.h"
 #include "bookmarks.h"
-#include "themes.h"
 #include "gui.h"
 #include "webui.h"
 #include "timezones.h"
@@ -28,14 +27,11 @@ static rg_gui_event_t toggle_tabs_cb(rg_gui_option_t *option, rg_gui_event_t eve
 {
     if (event == RG_DIALOG_ENTER)
     {
-        rg_gui_option_t options[gui.tabcount + 1];
-        rg_gui_option_t *option = &options[0];
+        rg_gui_option_t options[gui.tabs_count + 1];
 
-        for (int i = 0; i < gui.tabcount; ++i)
-        {
-            *option++ = (rg_gui_option_t){i, gui.tabs[i]->name, "...", 1, &toggle_tab_cb};
-        }
-        *option++ = (rg_gui_option_t)RG_DIALOG_CHOICE_LAST;
+        for (size_t i = 0; i < gui.tabs_count; ++i)
+            options[i] = (rg_gui_option_t){i, gui.tabs[i]->name, "...", 1, &toggle_tab_cb};
+        options[gui.tabs_count] = (rg_gui_option_t)RG_DIALOG_CHOICE_LAST;
 
         rg_gui_dialog("Tabs Visibility", options, 0);
         gui_redraw();
@@ -105,6 +101,21 @@ static rg_gui_event_t show_preview_cb(rg_gui_option_t *option, rg_gui_event_t ev
     return RG_DIALOG_VOID;
 }
 
+static rg_gui_event_t theme_cb(rg_gui_option_t *option, rg_gui_event_t event)
+{
+    if (event == RG_DIALOG_ENTER)
+    {
+        char *path = rg_gui_file_picker("Theme", RG_BASE_PATH_THEMES, NULL);
+        const char *theme = path ? rg_basename(path) : NULL;
+        gui_set_theme(theme);
+        rg_gui_set_theme(theme);
+        free(path);
+    }
+
+    sprintf(option->value, "%s", gui.theme ?: "Default");
+    return RG_DIALOG_VOID;
+}
+
 static rg_gui_event_t color_theme_cb(rg_gui_option_t *option, rg_gui_event_t event)
 {
     int max = gui_themes_count - 1;
@@ -125,12 +136,12 @@ static rg_gui_event_t startup_app_cb(rg_gui_option_t *option, rg_gui_event_t eve
     const char *modes[] = {"Last game", "Launcher"};
     int max = 1;
 
-    if (event == RG_DIALOG_PREV && --gui.startup < 0)
-        gui.startup = max;
-    if (event == RG_DIALOG_NEXT && ++gui.startup > max)
-        gui.startup = 0;
+    if (event == RG_DIALOG_PREV && --gui.startup_mode < 0)
+        gui.startup_mode = max;
+    if (event == RG_DIALOG_NEXT && ++gui.startup_mode > max)
+        gui.startup_mode = 0;
 
-    strcpy(option->value, modes[gui.startup % (max + 1)]);
+    strcpy(option->value, modes[gui.startup_mode % (max + 1)]);
     return RG_DIALOG_VOID;
 }
 
@@ -154,7 +165,7 @@ static void retro_loop(void)
 
     if (!tab)
     {
-        gui.selected = 0;
+        gui.selected_tab = 0;
         tab = gui_get_current_tab();
     }
 
@@ -170,9 +181,9 @@ static void retro_loop(void)
             if (change_tab)
             {
                 gui_event(TAB_LEAVE, tab);
-                tab = gui_set_current_tab(gui.selected + change_tab);
-                for (int tabs = gui.tabcount; !tab->enabled && --tabs > 0;)
-                    tab = gui_set_current_tab(gui.selected + change_tab);
+                tab = gui_set_current_tab(gui.selected_tab + change_tab);
+                for (int tabs = gui.tabs_count; !tab->enabled && --tabs > 0;)
+                    tab = gui_set_current_tab(gui.selected_tab + change_tab);
                 change_tab = 0;
             }
 
@@ -279,6 +290,12 @@ static void retro_loop(void)
             gui.idle_counter = 0;
             next_idle_event = rg_system_timer() + 100000;
         }
+        else if (gui.http_lock)
+        {
+            rg_gui_draw_dialog("HTTP Server Busy...", NULL, 0);
+            while (gui.http_lock) // Note: Maybe we should yield on user action, even if risky?
+                usleep(100 * 1000);
+        }
         else if (rg_system_timer() >= next_idle_event)
         {
             gui.idle_counter++;
@@ -327,14 +344,6 @@ void event_handler(int event, void *arg)
 {
     if (event == RG_EVENT_REDRAW)
         gui_redraw();
-#ifdef RG_ENABLE_NETWORKING
-    if (event == RG_EVENT_NETWORK_CONNECTED)
-    {
-        if (rg_network_sync_time("pool.ntp.org", 0))
-            rg_system_save_time();
-        webui_start();
-    }
-#endif
 }
 
 void app_main(void)
@@ -343,7 +352,8 @@ void app_main(void)
         .event = &event_handler,
     };
     const rg_gui_option_t options[] = {
-        {0, "Color theme ", "...", 1, &color_theme_cb},
+        {0, "Theme       ", "...", 1, &theme_cb},
+        {0, " - Color    ", "...", 1, &color_theme_cb},
         {0, "Preview     ", "...", 1, &show_preview_cb},
         {0, "Start screen", "...", 1, &start_screen_cb},
         {0, "Hide tabs   ", "...", 1, &toggle_tabs_cb},
@@ -367,19 +377,18 @@ void app_main(void)
     {
         rg_storage_mkdir(RG_BASE_PATH_CACHE);
         rg_storage_mkdir(RG_BASE_PATH_CONFIG);
-        rg_storage_mkdir(RG_BASE_PATH_SYSTEM);
         try_migrate();
     }
 
 #ifdef RG_ENABLE_NETWORKING
     rg_network_init();
-    rg_network_wifi_start(RG_WIFI_STA, NULL, NULL, 0);
+    rg_network_wifi_start(NULL, NULL, 0);
+    webui_start();
 #endif
 
     gui_init();
     applications_init();
     bookmarks_init();
-    themes_init();
 
     retro_loop();
 }

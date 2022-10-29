@@ -16,6 +16,13 @@ static const char *SETTING_PALETTE  = "Palette";
 // --- MAIN
 
 
+static void set_rtc_time(void)
+{
+    time_t timer = time(NULL);
+    struct tm *info = localtime(&timer);
+    gnuboy_set_time(info->tm_yday, info->tm_hour, info->tm_min, info->tm_sec);
+}
+
 static bool screenshot_handler(const char *filename, int width, int height)
 {
     return rg_display_save_frame(filename, currentUpdate, width, height);
@@ -37,6 +44,7 @@ static bool load_state_handler(const char *filename)
 
         return false;
     }
+    set_rtc_time();
 
     skipFrames = 0;
     autoSaveSRAM_Timer = 0;
@@ -54,11 +62,7 @@ static bool reset_handler(bool hard)
     autoSaveSRAM_Timer = 0;
 
     if (hard)
-    {
-        time_t timer = time(NULL);
-        struct tm *info = localtime(&timer);
-        gnuboy_set_time(info->tm_yday, info->tm_hour, info->tm_min, info->tm_sec);
-    }
+        set_rtc_time();
 
     return true;
 }
@@ -257,9 +261,9 @@ void gbc_main(void)
 
     // Load BIOS
     if (gnuboy_get_hwtype() == GB_HW_CGB)
-        gnuboy_load_bios(RG_BASE_PATH_SYSTEM "/gbc_bios.bin");
+        gnuboy_load_bios(RG_BASE_PATH_BIOS "/gbc_bios.bin");
     else
-        gnuboy_load_bios(RG_BASE_PATH_SYSTEM "/gb_bios.bin");
+        gnuboy_load_bios(RG_BASE_PATH_BIOS "/gb_bios.bin");
 
     gnuboy_set_palette(rg_settings_get_number(NS_APP, SETTING_PALETTE, GB_PALETTE_CGB));
 
@@ -271,6 +275,9 @@ void gbc_main(void)
         rg_emu_load_state(app->saveSlot);
     else
         gnuboy_load_sram(sramFile);
+
+    // Do this after loading a state, to overwrite the RTC
+    set_rtc_time();
 
     // Don't show palette option for GBC
     if (gnuboy_get_hwtype() == GB_HW_CGB)

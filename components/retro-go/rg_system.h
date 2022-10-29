@@ -11,15 +11,16 @@ extern "C" {
 
 #include "config.h"
 
-#ifdef RG_TARGET_SDL2
-#define IRAM_ATTR
-#define RTC_NOINIT_ATTR
-#else
+#ifndef RG_TARGET_SDL2
 #include <esp_idf_version.h>
 #include <esp_attr.h>
 #if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(4, 3, 0)
 #define SPI_DMA_CH_AUTO 1
 #endif
+#else
+#define EXT_RAM_ATTR
+#define IRAM_ATTR
+#define RTC_NOINIT_ATTR
 #endif
 
 #include "rg_audio.h"
@@ -191,9 +192,8 @@ void rg_system_panic(const char *context, const char *message) __attribute__((no
 void rg_system_shutdown(void) __attribute__((noreturn));
 void rg_system_sleep(void) __attribute__((noreturn));
 void rg_system_restart(void) __attribute__((noreturn));
-void rg_system_start_app(const char *app, const char *name, const char *args, uint32_t flags) __attribute__((noreturn));
-void rg_system_set_boot_app(const char *app);
-bool rg_system_find_app(const char *app);
+void rg_system_switch_app(const char *part, const char *name, const char *args, uint32_t flags) __attribute__((noreturn));
+bool rg_system_have_app(const char *app);
 void rg_system_set_led(int value);
 int  rg_system_get_led(void);
 void rg_system_tick(int busyTime);

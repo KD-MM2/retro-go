@@ -26,13 +26,14 @@ compatibility!
 - Favorites and recently played
 - GB color palettes, RTC adjust and save
 - NES color palettes, PAL roms, NSF support
-- More emulators, applications
+- More emulators and applications
 - Scaling and filtering options
 - Better performance and compatibility
 - Turbo Speed/Fast forward
 - Customizable launcher
 - Cover art and save state previews
-- exFAT support
+- Multiple save slots per game
+- Wifi file manager
 - And more!
 
 ### Screenshots
@@ -64,45 +65,32 @@ This method is intended to be used when .fw support isn't available (when portin
 Game covers should be placed in the `romart` folder at the base of your sd card. You can obtain a pre-made pack from
 this repository or from the release page. Retro-Go is also compatible with the older Go-Play romart pack.
 
-### Adding covers
-The preferred cover art format is PNG with a resolution of max 160x168 and I recommend post-processing your
-PNG with [pngquant](https://pngquant.org/) or [imagemagick](https://imagemagick.org/script/index.php)'s
-`-colors 255` for smaller file sizes.
-
-You can use one of two naming schemes:
-- Using the CRC32 (press A -> Properties in the launcher to find it). Assuming a CRC of ABCDE123, the cover file
-  will be `/romart/nes/A/ABCDE123.png`.
-- Using the rom file name. Assuming a rom named `myrom.nes`, the cover file will be
-  `/romart/nes/myrom.nes.png` (notice the inclusion of the rom extension).
+You can add missing cover art by creating a PNG image (160x168, 8bit) named according to the following scheme:
+`/romart/nes/A/ABCDE123.png` where `nes` is the same as the rom folder, and `ABCDE123` is the CRC32 of the game
+(press A -> Properties in the launcher to find it).
 
 ## BIOS files
 Some emulators support loading a BIOS. The files should be placed as follows:
-- GB: `/retro-go/system/gb_bios.bin`
-- GBC: `/retro-go/system/gbc_bios.bin`
-- FDS: `/retro-go/system/fds_bios.bin`
+- GB: `/retro-go/bios/gb_bios.bin`
+- GBC: `/retro-go/bios/gbc_bios.bin`
+- FDS: `/retro-go/bios/fds_bios.bin`
 
 ## Wifi
-**Important: Wifi features are only present in CI builds at this time. This notice will be removed once it makes its way to a release.**
 
-### Configuration
-You need to add a wifi section in your `/retro-go/config/retro-go.json` file. It should look like this:
+To use wifi you will need to add your config to `/retro-go/config/wifi.json` file.
+It should look like this:
+
 ````json
 {
-  "global": {
-    // ...
-  },
-  "wifi": {
-    "ssid": "my-network",
-    "password": "my-password"
-  }
+  "ssid": "my-network",
+  "password": "my-password"
 }
 ````
-If you are unfamiliar with JSON syntax you can run your config file [through a validator](https://jsonlint.com/)
-to confirm that it is correct.
 
 ### Time synchronization
-Time synchronization happens in the launcher, immediately after a successful connection to the network.
-I will add instructions for the timezone soon.
+Time synchronization happens in the launcher immediately after a successful connection to the network.
+This is done via NTP by contacting `pool.ntp.org` and cannot be disabled at this time.
+Timezone can be configured in the launcher's options menu.
 
 ### File manager
 You can find the IP of your device in the *about* menu of retro-go. Then on your PC navigate to
@@ -195,7 +183,8 @@ Retro-Go and ESP32-specific code exclusively in their port file (main.c). This m
 - The Lynx emulator is a port of [libretro-handy](https://github.com/libretro/libretro-handy).
 - The SNES emulator is a port of [Snes9x 2005](https://github.com/libretro/snes9x2005).
 - The DOOM engine is a port of [PrBoom 2.5.0](http://prboom.sourceforge.net/).
-- The Mega Drive emulator is a port of [Gwenesis](https://github.com/bzhxx/gwenesis/) by bzhxx.
+- The Genesis emulator is a port of [Gwenesis](https://github.com/bzhxx/gwenesis/) by bzhxx.
+- The Game & Watch emulator is a port of [lcd-game-emulator](https://github.com/bzhxx/lcd-game-emulator) by bzhxx.
 - PNG support is provided by [lodepng](https://github.com/lvandeve/lodepng/).
 - PCE cover art is from [Christian_Haitian](https://github.com/christianhaitian).
 - Some icons from [Rokey](https://iconarchive.com/show/seed-icons-by-rokey.html).
